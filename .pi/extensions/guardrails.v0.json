@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/@aliou/pi-guardrails@0.13.1/schema.json",
+  "pathAccess": {
+    "allowedPaths": [
+      "/dev/null",
+      "/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/"
+    ]
+  }
+}
