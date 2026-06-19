@@ -21,10 +21,17 @@ def register_tools(mcp):
         try:
             project = get_project()
             track = project.tracks[track_index]
-            fx_index = track.add_fx(fx_name)
-            if fx_index < 0:
+            fx = track.add_fx(fx_name)
+            if fx is None:
                 return {"success": False, "error": f"Plugin not found: '{fx_name}'"}
-            fx = track.fxs[fx_index]
+            # Find the index of this FX on the track
+            fx_index = None
+            for i in range(track.n_fxs):
+                if track.fxs[i].name == fx.name:
+                    fx_index = i
+                    break
+            if fx_index is None:
+                fx_index = track.n_fxs - 1
             return {
                 "success": True,
                 "fx_index": fx_index,
@@ -60,7 +67,7 @@ def register_tools(mcp):
             project = get_project()
             track = project.tracks[track_index]
             fx = track.fxs[fx_index]
-            fx.params[param_index].normalized_value = value
+            RPR.TrackFX_SetParamNormalized(track.id, fx_index, param_index, value)
             param_name = fx.params[param_index].name
             return {
                 "success": True,
@@ -83,11 +90,15 @@ def register_tools(mcp):
             params = []
             for i in range(fx.n_params):
                 param = fx.params[i]
+                pmin, pmax = param.range
                 params.append({
                     "index": i,
                     "name": param.name,
-                    "normalized_value": param.normalized_value,
-                    "formatted_value": param.formatted_value,
+                    "normalized_value": float(param.normalized),
+                    "raw_value": float(param),
+                    "min": pmin,
+                    "max": pmax,
+                    "formatted_value": param.formatted,
                 })
             return {
                 "success": True,
@@ -108,10 +119,15 @@ def register_tools(mcp):
             fx_list = []
             for i in range(track.n_fxs):
                 fx = track.fxs[i]
+                try:
+                    preset = fx.preset
+                except Exception:
+                    preset = ""
                 fx_list.append({
                     "index": i,
                     "name": fx.name,
                     "enabled": fx.is_enabled,
+                    "preset": preset,
                     "n_params": fx.n_params,
                 })
             return {"success": True, "track_index": track_index, "fx": fx_list}
@@ -143,13 +159,13 @@ def register_tools(mcp):
             project = get_project()
             track = project.tracks[track_index]
             fx = track.fxs[fx_index]
-            fx.preset_name = preset_name
+            fx.preset = preset_name
             return {
                 "success": True,
                 "track_index": track_index,
                 "fx_index": fx_index,
                 "fx_name": fx.name,
-                "preset": fx.preset_name,
+                "preset": fx.preset,
             }
         except Exception as e:
             return {"success": False, "error": str(e)}

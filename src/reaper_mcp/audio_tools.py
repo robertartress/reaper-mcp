@@ -49,7 +49,7 @@ def register_tools(mcp):
         try:
             project = get_project()
             track = project.tracks[track_index]
-            track.armed = True
+            RPR.SetMediaTrackInfo_Value(track.id, "I_RECARM", 1)
             RPR.Main_OnCommand(1013, 0)  # Transport: Record
             return {
                 "success": True,
@@ -112,16 +112,17 @@ def register_tools(mcp):
                 item.length -= start_trim
                 take = item.active_take
                 if take:
-                    take.start_offset += start_trim
+                    current_offset = RPR.GetMediaItemTakeInfo_Value(take.id, "D_STARTOFFS")
+                    RPR.SetMediaItemTakeInfo_Value(take.id, "D_STARTOFFS", current_offset + start_trim)
 
             if end_trim > 0:
                 item.length -= end_trim
 
             if fade_in > 0:
-                item.fade_in_length = fade_in
+                RPR.SetMediaItemInfo_Value(item.id, "D_FADEINLEN", fade_in)
 
             if fade_out > 0:
-                item.fade_out_length = fade_out
+                RPR.SetMediaItemInfo_Value(item.id, "D_FADEOUTLEN", fade_out)
 
             return {
                 "success": True,
@@ -141,12 +142,13 @@ def register_tools(mcp):
             track = project.tracks[track_index]
             item = track.items[item_index]
             take = item.active_take
-            take.pitch = semitones
+            RPR.SetMediaItemTakeInfo_Value(take.id, "D_PITCH", semitones)
+            pitch_val = RPR.GetMediaItemTakeInfo_Value(take.id, "D_PITCH")
             return {
                 "success": True,
                 "track_index": track_index,
                 "item_index": item_index,
-                "pitch_semitones": take.pitch,
+                "pitch_semitones": pitch_val,
             }
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -159,12 +161,13 @@ def register_tools(mcp):
             track = project.tracks[track_index]
             item = track.items[item_index]
             take = item.active_take
-            take.playback_rate = rate
+            RPR.SetMediaItemTakeInfo_Value(take.id, "D_PLAYRATE", rate)
+            rate_val = RPR.GetMediaItemTakeInfo_Value(take.id, "D_PLAYRATE")
             return {
                 "success": True,
                 "track_index": track_index,
                 "item_index": item_index,
-                "playback_rate": take.playback_rate,
+                "playback_rate": rate_val,
             }
         except Exception as e:
             return {"success": False, "error": str(e)}

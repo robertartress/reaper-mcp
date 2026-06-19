@@ -5,6 +5,7 @@ import reapy
 from reapy import reascript_api as RPR
 
 from reaper_mcp.connection import get_project
+from reaper_mcp.mixing_tools import _db_to_linear, _linear_to_db
 
 logger = logging.getLogger("reaper_mcp.mastering_tools")
 
@@ -23,7 +24,7 @@ def register_tools(mcp):
         try:
             project = get_project()
             master = project.master_track
-            fx_index = master.add_fx(fx_name)
+            fx_index = RPR.TrackFX_AddByName(master.id, fx_name, False, 1)
             if fx_index < 0:
                 return {"success": False, "error": f"Plugin not found: '{fx_name}'"}
             fx = master.fxs[fx_index]
@@ -40,7 +41,11 @@ def register_tools(mcp):
             fx_list = []
             for i in range(master.n_fxs):
                 fx = master.fxs[i]
-                fx_list.append({"index": i, "name": fx.name, "enabled": fx.is_enabled, "n_params": fx.n_params})
+                try:
+                    preset = fx.preset
+                except Exception:
+                    preset = ""
+                fx_list.append({"index": i, "name": fx.name, "enabled": fx.is_enabled, "preset": preset, "n_params": fx.n_params})
             return {"success": True, "fx": fx_list}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -52,7 +57,7 @@ def register_tools(mcp):
             project = get_project()
             master = project.master_track
             fx = master.fxs[fx_index]
-            fx.params[param_index].normalized_value = value
+            RPR.TrackFX_SetParamNormalized(master.id, fx_index, param_index, value)
             return {
                 "success": True,
                 "fx_index": fx_index,
@@ -69,8 +74,9 @@ def register_tools(mcp):
         try:
             project = get_project()
             master = project.master_track
-            master.volume = volume_db
-            return {"success": True, "volume_db": master.volume}
+            RPR.SetMediaTrackInfo_Value(master.id, "D_VOL", _db_to_linear(volume_db))
+            vol_db = _linear_to_db(RPR.GetMediaTrackInfo_Value(master.id, "D_VOL"))
+            return {"success": True, "volume_db": vol_db}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -187,8 +193,9 @@ def register_tools(mcp):
             gain_db = target_lufs - current_lufs
             project = get_project()
             master = project.master_track
-            new_vol_db = master.volume + gain_db
-            master.volume = new_vol_db
+            current_vol_db = _linear_to_db(RPR.GetMediaTrackInfo_Value(master.id, "D_VOL"))
+            new_vol_db = current_vol_db + gain_db
+            RPR.SetMediaTrackInfo_Value(master.id, "D_VOL", _db_to_linear(new_vol_db))
 
             return {
                 "success": True,

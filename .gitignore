@@ -39,3 +39,12 @@ Thumbs.db
 # REAPER specific
 *.RPP-bak
 *.reapeaks
+
+# REAPER MCP snapshots (keep JSON in git, ignore large binary exports)
+snapshots/**/*.rfxchain
+snapshots/**/*.rTrackTemplate
+
+# Test artifacts
+.pytest_cache/
+/snapshots
+PTX_REVERSE_ENGINEERING_NOTES.md

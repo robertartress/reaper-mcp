@@ -5,7 +5,8 @@
       "/dev/null",
       "/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/",
       "/var/folders/zq/ddh3pyhx2b5gmczhn5wzbz100000gn/T/TemporaryItems/NSIRD_screencaptureui_oyuXCm/",
-      "~/.pi/agent/skills/reaper-mix-prep/"
+      "~/.pi/agent/skills/reaper-mix-prep/",
+      "~/Library/Application Support/REAPER/FXChains/"
     ]
   },
   "version": "0.9.0-20260327"

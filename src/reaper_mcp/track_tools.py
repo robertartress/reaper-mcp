@@ -4,6 +4,7 @@ import reapy
 from reapy import reascript_api as RPR
 
 from reaper_mcp.connection import get_project
+from reaper_mcp.mixing_tools import _db_to_linear, _linear_to_db
 
 logger = logging.getLogger("reaper_mcp.track_tools")
 
@@ -65,8 +66,9 @@ def register_tools(mcp):
         try:
             project = get_project()
             track = project.tracks[track_index]
-            track.volume = volume_db
-            return {"success": True, "track_index": track_index, "volume_db": track.volume}
+            RPR.SetMediaTrackInfo_Value(track.id, "D_VOL", _db_to_linear(volume_db))
+            vol_db = _linear_to_db(RPR.GetMediaTrackInfo_Value(track.id, "D_VOL"))
+            return {"success": True, "track_index": track_index, "volume_db": vol_db}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -76,8 +78,9 @@ def register_tools(mcp):
         try:
             project = get_project()
             track = project.tracks[track_index]
-            track.pan = pan
-            return {"success": True, "track_index": track_index, "pan": track.pan}
+            RPR.SetMediaTrackInfo_Value(track.id, "D_PAN", pan)
+            pan_val = RPR.GetMediaTrackInfo_Value(track.id, "D_PAN")
+            return {"success": True, "track_index": track_index, "pan": pan_val}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -87,8 +90,8 @@ def register_tools(mcp):
         try:
             project = get_project()
             track = project.tracks[track_index]
-            track.mute = muted
-            return {"success": True, "track_index": track_index, "muted": track.mute}
+            track.is_muted = muted
+            return {"success": True, "track_index": track_index, "muted": track.is_muted}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -98,8 +101,8 @@ def register_tools(mcp):
         try:
             project = get_project()
             track = project.tracks[track_index]
-            track.solo = soloed
-            return {"success": True, "track_index": track_index, "soloed": track.solo}
+            track.is_solo = soloed
+            return {"success": True, "track_index": track_index, "soloed": track.is_solo}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -122,17 +125,19 @@ def register_tools(mcp):
                     "index": i,
                     "position": item.position,
                     "length": item.length,
-                    "name": item.name,
                 })
+
+            vol_db = _linear_to_db(RPR.GetMediaTrackInfo_Value(track.id, "D_VOL"))
+            pan_val = RPR.GetMediaTrackInfo_Value(track.id, "D_PAN")
 
             return {
                 "success": True,
                 "track_index": track_index,
                 "name": track.name,
-                "volume_db": track.volume,
-                "pan": track.pan,
-                "muted": track.mute,
-                "soloed": track.solo,
+                "volume_db": vol_db,
+                "pan": pan_val,
+                "muted": track.is_muted,
+                "soloed": track.is_solo,
                 "fx_count": track.n_fxs,
                 "fx": fx_list,
                 "item_count": track.n_items,
@@ -149,13 +154,15 @@ def register_tools(mcp):
             tracks = []
             for i in range(project.n_tracks):
                 track = project.tracks[i]
+                vol_db = _linear_to_db(RPR.GetMediaTrackInfo_Value(track.id, "D_VOL"))
+                pan_val = RPR.GetMediaTrackInfo_Value(track.id, "D_PAN")
                 tracks.append({
                     "index": i,
                     "name": track.name,
-                    "volume_db": track.volume,
-                    "pan": track.pan,
-                    "muted": track.mute,
-                    "soloed": track.solo,
+                    "volume_db": vol_db,
+                    "pan": pan_val,
+                    "muted": track.is_muted,
+                    "soloed": track.is_solo,
                     "fx_count": track.n_fxs,
                     "item_count": track.n_items,
                 })

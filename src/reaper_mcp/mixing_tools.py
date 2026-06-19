@@ -1,4 +1,5 @@
 import logging
+import math
 
 import reapy
 from reapy import reascript_api as RPR
@@ -12,6 +13,12 @@ def _db_to_linear(db: float) -> float:
     if db <= -150:
         return 0.0
     return 10 ** (db / 20.0)
+
+
+def _linear_to_db(linear: float) -> float:
+    if linear <= 0.0:
+        return -150.0
+    return 20 * math.log10(linear)
 
 
 def register_tools(mcp):

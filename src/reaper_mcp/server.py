@@ -16,6 +16,7 @@ from reaper_mcp.mixing_tools import register_tools as _reg_mixing
 from reaper_mcp.render_tools import register_tools as _reg_render
 from reaper_mcp.mastering_tools import register_tools as _reg_mastering
 from reaper_mcp.analysis_tools import register_tools as _reg_analysis
+from reaper_mcp.snapshot_tools import register_tools as _reg_snapshot
 
 _reg_project(mcp)
 _reg_track(mcp)
@@ -26,3 +27,4 @@ _reg_mixing(mcp)
 _reg_render(mcp)
 _reg_mastering(mcp)
 _reg_analysis(mcp)
+_reg_snapshot(mcp)

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "mcp": {
+    "reaper": {
+      "type": "local",
+      "command": [".venv/bin/reaper-mcp-server"],
+      "cwd": ".",
+      "enabled": true,
+      "environment": {
+        "PYTHONUNBUFFERED": "1"
+      },
+      "timeout": 120000
+    }
+  },
+  "permission": {
+    "reaper_create_project": "ask",
+    "reaper_load_project": "ask",
+    "reaper_save_project": "ask",
+    "reaper_delete_track": "ask",
+    "reaper_remove_fx": "ask",
+    "reaper_remove_send": "ask",
+    "reaper_start_recording": "ask",
+    "reaper_render_project": "ask",
+    "reaper_render_stems": "ask",
+    "reaper_render_time_selection": "ask",
+    "reaper_apply_mastering_chain": "ask",
+    "reaper_apply_limiter": "ask",
+    "reaper_normalize_project": "ask",
+    "reaper_apply_snapshot": "ask"
+  },
+  "command": {
+    "reaper": {
+      "description": "Show REAPER MCP server status and available tools",
+      "template": "Check the status of the REAPER MCP server. List the available reaper_* tools and confirm whether the server is connected to a running REAPER instance. If it is not connected, explain how to enable REAPER's distant API (Actions > Run ReaScript > `import reapy; reapy.config.enable_dist_api()`) and restart REAPER."
+    }
+  }
+}
