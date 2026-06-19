@@ -412,26 +412,18 @@ def _find_send_to_dest(track_id, dest_track_id):
 def _reorder_tracks(project, desired_track_ids):
     """Reorder tracks so that track IDs appear in the order of desired_track_ids.
 
-    Uses InsertTrackAtIndex + MoveMediaItemToTrack + TrackFX_CopyToTrack + DeleteTrack
-    since Main_OnCommand move actions don't work through the distant API.
+    Uses ReorderSelectedTracks, REAPER's native track-reordering API. This
+    moves the entire track (items, FX, sends, settings) as a single atomic
+    operation — no tracks are created or deleted, so there is no risk of
+    clip doubling, stale data from recycled tracks, or broken sends.
 
-    Tracks not in desired_track_ids are left at the end in their current relative order.
+    Tracks not in desired_track_ids are left at the end in their current
+    relative order.
+
+    desired_track_ids is updated in place: entries that pointed to track IDs
+    remain valid (ReorderSelectedTracks preserves track IDs/GUIDs), so callers
+    can still use them to look up post-reorder indices.
     """
-    # Build a set of track IDs that need to be in specific positions.
-    desired_set = set()
-    for tid in desired_track_ids:
-        if tid is not None:
-            desired_set.add(tid)
-
-    # For each desired position, ensure the right track is there.
-    # We process from top to bottom. When a track is out of position, we:
-    # 1. Insert a new track at the target position
-    # 2. Move all items from the source track to the new track
-    # 3. Copy FX chain from source to new
-    # 4. Copy track name
-    # 5. Delete the old (now empty) source track
-    # 6. Update the desired_track_ids list to point to the new track
-
     for target_pos in range(len(desired_track_ids)):
         desired_id = desired_track_ids[target_pos]
         if desired_id is None:
@@ -445,69 +437,16 @@ def _reorder_tracks(project, desired_track_ids):
                 break
 
         if current_pos is None:
-            # Track was already moved/deleted — skip.
             continue
 
         if current_pos == target_pos:
             continue
 
-        # Insert a new track at the target position.
-        # wantNewTrack=True is critical: with False, REAPER recycles
-        # previously-deleted tracks from its internal pool, which can
-        # still carry stale media items, FX chains, and settings from
-        # their previous life. This causes clips to be doubled up on
-        # the destination track (the "buried clip" bug).
-        RPR.InsertTrackAtIndex(target_pos, True)
-        new_track = project.tracks[target_pos]
-
-        # Get the source track (its position may have shifted by +1 due to insertion).
-        source_track = project.tracks[current_pos + 1]
-
-        # Copy name.
-        source_name = RPR.GetSetMediaTrackInfo_String(source_track.id, "P_NAME", "", False)[3]
-        RPR.GetSetMediaTrackInfo_String(new_track.id, "P_NAME", source_name, True)
-
-        # Move all items from source to new track.
-        n_items = RPR.CountTrackMediaItems(source_track.id)
-        for _ in range(n_items):
-            item_id = RPR.GetTrackMediaItem(source_track.id, 0)
-            RPR.MoveMediaItemToTrack(item_id, new_track.id)
-
-        # Copy FX chain.
-        n_fx = RPR.TrackFX_GetCount(source_track.id)
-        for fx_idx in range(n_fx):
-            RPR.TrackFX_CopyToTrack(source_track.id, fx_idx, new_track.id, fx_idx, False)
-
-        # Copy key track settings (volume, pan, color, mute, solo, phase, main send,
-        # folder depth, automation, input). These will also be set by apply_snapshot
-        # later, but we copy them now so the track is functional before the apply step.
-        for field in ["D_VOL", "D_PAN", "I_CUSTOMCOLOR", "B_MUTE", "B_SOLO",
-                       "B_PHASE", "B_MAINSEND", "I_FOLDERDEPTH", "I_AUTOMODE",
-                       "I_RECINPUT", "I_RECMON"]:
-            val = RPR.GetMediaTrackInfo_Value(source_track.id, field)
-            RPR.SetMediaTrackInfo_Value(new_track.id, field, val)
-
-        # Copy sends from source to new track.
-        n_sends = RPR.GetTrackNumSends(source_track.id, 0)
-        for s_idx in range(n_sends):
-            ptr = RPR.GetTrackSendInfo_Value(source_track.id, 0, s_idx, "P_DESTTRACK")
-            try:
-                dest_track = reapy.Track(reapy.Track._get_id_from_pointer(ptr))
-                new_send = RPR.CreateTrackSend(new_track.id, dest_track.id)
-                for sfield in ["D_VOL", "D_PAN", "I_SENDMODE", "B_MUTE", "B_PHASE"]:
-                    sval = RPR.GetTrackSendInfo_Value(source_track.id, 0, s_idx, sfield)
-                    RPR.SetTrackSendInfo_Value(new_track.id, 0, new_send, sfield, sval)
-            except Exception:
-                pass
-
-        # Delete the old source track.
-        RPR.DeleteTrack(source_track.id)
-
-        # Update desired_track_ids to point to the new track's ID.
-        new_id = new_track.id
-        for j in range(len(desired_track_ids)):
-            if desired_track_ids[j] == desired_id:
-                desired_track_ids[j] = new_id
+        # Select only this track, then let REAPER move it natively.
+        # ReorderSelectedTracks handles all internal bookkeeping — items,
+        # FX, sends, and folder state all move with the track as-is.
+        RPR.SetOnlyTrackSelected(desired_id)
+        RPR.ReorderSelectedTracks(target_pos, 0)
 
 
 def _apply_sends(track_id, track_snap, mapping, report, dry_run=False,
@@ -1134,14 +1073,12 @@ def register_tools(mcp):
 
                     _reorder_tracks(project, desired_track_ids)
 
-                    # Re-resolve mapping by track ID. _reorder_tracks moves tracks
-                    # via insert+copy+delete, so track IDs change, but it updates
-                    # desired_track_ids in place to reflect the new IDs. We look up
-                    # each track's current index by its post-reorder ID. This is
-                    # reliable even when the new session's track names differ from
-                    # the snapshot (the whole point of prep-mix), unlike a
-                    # name-based lookup which fails to match renamed tracks and
-                    # falls back to stale pre-reorder indices (scrambling settings).
+                    # Re-resolve mapping by track ID. _reorder_tracks uses
+                    # ReorderSelectedTracks, which preserves track IDs/GUIDs —
+                    # no tracks are created or deleted. We look up each track's
+                    # current index by its ID to build the post-reorder mapping.
+                    # This is reliable even when the new session's track names
+                    # differ from the snapshot (the whole point of prep-mix).
                     new_mapping = {}
                     for pos, snap_track in enumerate(snapshot_tracks):
                         snap_idx = snap_track["index"]
